@@ -35,5 +35,5 @@ supabase/.branches/
 Thumbs.db
 Desktop.ini
 
-# Duplicate source archive; keep the extracted planning files instead
-EvolveFit_AI_Codex_Starter_Pack.zip
+# Local source archives
+*.zip

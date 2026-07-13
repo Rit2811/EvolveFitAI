@@ -17,7 +17,7 @@ Gemini is called only by Express. The browser receives only the public Supabase 
 client/                 React application
 server/                 Express API and AI validation/fallback services
 supabase/migrations/    profiles, plans, and check_ins schema with RLS
-evolvefit_codex_pack/   project documentation and task specifications
+scripts/                release and environment preflight checks
 ```
 
 ## Setup
