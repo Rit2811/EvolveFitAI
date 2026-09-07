@@ -1,4 +1,4 @@
-import { DAYS } from './planValidator.js'
+import { DAYS, resolveMealSchedule } from './planValidator.js'
 
 const exercises = {
   Bodyweight: [['Bodyweight squat', '10-12'], ['Incline push-up', '8-12'], ['Glute bridge', '12-15'], ['Dead bug', '8 each side']],
@@ -15,7 +15,7 @@ export function createFallbackPlan(profile) {
   const equipment = profile.equipment.find((item) => exercises[item]) || 'Bodyweight'
   const movementList = personalizeExercises(exercises[equipment] || exercises.Bodyweight, profile)
   const activeDays = Number(profile.workout_days)
-  const scheduledDays = new Set(validWorkoutDays(profile.workout_day_preferences, activeDays) || defaultWorkoutDays(activeDays))
+  const scheduledDays = new Set(resolveWorkoutDays(profile.workout_day_preferences, activeDays))
   const workoutPlan = DAYS.map((day, index) => {
     const isRestDay = !scheduledDays.has(day)
     return isRestDay
@@ -23,10 +23,11 @@ export function createFallbackPlan(profile) {
       : { day, title: index % 2 ? 'Full-body foundations' : 'Strength and movement', type: 'Strength', duration: Number(profile.workout_duration), intensity: profile.experience === 'Beginner' ? 'Easy to moderate' : 'Moderate', isRestDay: false, exercises: movementList.slice(0, 4).map(([name, reps]) => ({ name, equipment, sets: profile.experience === 'Beginner' ? 2 : 3, reps, restSeconds: 60, instruction: 'Move with control and stop the set if form starts to change.' })) }
   })
   const meals = chooseMeals(profile)
+  const mealSchedule = resolveMealSchedule(profile)
   return {
-    summary: `${activeDays} achievable training days with simple ${profile.diet_type.toLowerCase()} meals built around your schedule.`,
+    summary: `${activeDays} achievable training days with ${profile.diet_type.toLowerCase()} meals matched to your real daily schedule.`,
     workoutPlan,
-    mealPlan: DAYS.map((day, index) => ({ day, ...meals[index % meals.length], estimatedCalories: 2000 + (index % 3) * 100, estimatedProtein: 90 + (index % 3) * 10 })),
+    mealPlan: DAYS.map((day, index) => ({ day, meals: mealSchedule.map((slot, slotIndex) => ({ label: slot.name, time: slot.time, food: mealForSlot(slot, meals[index % meals.length], slotIndex) })), estimatedCalories: 2000 + (index % 3) * 100, estimatedProtein: 90 + (index % 3) * 10 })),
     adaptationMessage: 'Initial plan created from your profile and preferences.',
     adaptationReasons: [],
   }
@@ -35,11 +36,22 @@ export function createFallbackPlan(profile) {
 function chooseMeals(profile) {
   const excluded = [...(profile.allergies || []), ...(profile.disliked_foods || [])].map((item) => String(item).toLowerCase())
   const type = String(profile.diet_type).toLowerCase()
-  const sets = type === 'vegan' ? veganMeals : type === 'vegetarian' ? vegetarianMeals : type === 'pescatarian' ? pescatarianMeals : mixedMeals
+  const baseSets = type === 'vegan' ? veganMeals : type === 'vegetarian' ? vegetarianMeals : type === 'pescatarian' ? pescatarianMeals : mixedMeals
+  const sets = baseSets
   const preferred = (profile.preferred_foods || []).map((item) => String(item).toLowerCase()).filter(Boolean)
   const safe = sets.filter((set) => !excluded.some((food) => JSON.stringify(set).toLowerCase().includes(food))).sort((a, b) => preferenceScore(b, preferred) - preferenceScore(a, preferred))
   if (safe.length) return safe
   return [{ breakfast: 'Seasonal fruit with plain oats', lunch: 'Rice with mixed vegetables', dinner: 'Potato and vegetable stew with flatbread', snack: 'Fresh cucumber and carrot slices' }]
+}
+
+function mealForSlot(slot, template, index) {
+  const name = String(slot.name).toLowerCase()
+  if (name.includes('breakfast') || name === 'brunch') return template.breakfast
+  if (name.includes('lunch')) return template.lunch
+  if (name.includes('dinner')) return template.dinner
+  if (name.includes('workout')) return index % 2 ? template.lunch : template.snack
+  if (name.includes('snack')) return template.snack
+  return [template.breakfast, template.lunch, template.dinner, template.snack][index % 4]
 }
 
 function personalizeExercises(movements, profile) {
@@ -48,11 +60,6 @@ function personalizeExercises(movements, profile) {
   const safe = movements.filter(([name]) => !avoided.some((item) => normalize(name).includes(item)))
   const available = safe.length ? safe : movements
   return [...available].sort(([left], [right]) => preferenceMatch(right, preferred) - preferenceMatch(left, preferred))
-}
-
-function validWorkoutDays(values, count) {
-  if (!Array.isArray(values) || values.length !== count || new Set(values).size !== count || values.some((day) => !DAYS.includes(day))) return null
-  return values
 }
 
 function defaultWorkoutDays(count) {
@@ -66,6 +73,18 @@ function defaultWorkoutDays(count) {
     7: DAYS,
   }
   return schedules[count] || DAYS.slice(0, count)
+}
+
+function resolveWorkoutDays(values, count) {
+  const preferred = Array.isArray(values) ? DAYS.filter((day) => values.includes(day)) : []
+  const balanced = defaultWorkoutDays(count)
+  const candidates = [
+    ...balanced.filter((day) => preferred.includes(day)),
+    ...preferred,
+    ...balanced,
+    ...DAYS,
+  ]
+  return [...new Set(candidates)].slice(0, count)
 }
 
 function preferenceScore(meal, preferred) { const text = JSON.stringify(meal).toLowerCase(); return preferred.filter((item) => text.includes(item)).length }

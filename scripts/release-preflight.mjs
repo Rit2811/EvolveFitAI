@@ -8,17 +8,6 @@ const check = (name, pass, detail) => checks.push({ name, pass, detail })
 const nodeMajor = Number(process.versions.node.split('.')[0])
 check('Node.js 20+', nodeMajor >= 20, `detected ${process.versions.node}`)
 
-const clientEnvPath = resolve(root, 'client/.env')
-const clientEnv = existsSync(clientEnvPath) ? parseEnv(readFileSync(clientEnvPath, 'utf8')) : {}
-check('client/.env exists', existsSync(clientEnvPath), 'copy client/.env.example and add public Supabase values')
-check('VITE_SUPABASE_URL configured', validValue(clientEnv.VITE_SUPABASE_URL, 'your-project'), 'required for authentication and persistence')
-check('VITE_SUPABASE_ANON_KEY configured', validValue(clientEnv.VITE_SUPABASE_ANON_KEY, 'your-public'), 'public anon key only; never use service_role')
-check('No service-role key in client env', !Object.values(clientEnv).some((value) => /service_role/i.test(value)), 'frontend must contain public credentials only')
-
-for (const migration of ['001_profiles.sql', '002_plans.sql', '003_check_ins.sql', '004_plan_preferences.sql']) {
-  check(`Migration ${migration}`, existsSync(resolve(root, 'supabase/migrations', migration)), 'must be applied to Supabase in numeric order')
-}
-
 const serverEnvPath = resolve(root, 'server/.env')
 const serverEnv = existsSync(serverEnvPath) ? parseEnv(readFileSync(serverEnvPath, 'utf8')) : {}
 check('Gemini mode', validValue(serverEnv.GEMINI_API_KEY, 'your-gemini') || !serverEnv.GEMINI_API_KEY, serverEnv.GEMINI_API_KEY ? 'live model enabled' : 'local fallback enabled')

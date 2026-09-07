@@ -32,8 +32,20 @@ export const planResponseSchema = {
       type: 'array', minItems: 7, maxItems: 7,
       items: {
         type: 'object', additionalProperties: false,
-        required: ['day', 'breakfast', 'lunch', 'dinner', 'snack', 'estimatedCalories', 'estimatedProtein'],
-        properties: { day, breakfast: text, lunch: text, dinner: text, snack: text, estimatedCalories: number, estimatedProtein: number },
+        required: ['day', 'meals', 'estimatedCalories', 'estimatedProtein'],
+        properties: {
+          day,
+          meals: {
+            type: 'array', minItems: 2, maxItems: 6,
+            items: {
+              type: 'object', additionalProperties: false,
+              required: ['label', 'time', 'food'],
+              properties: { label: text, time: text, food: text },
+            },
+          },
+          estimatedCalories: number,
+          estimatedProtein: number,
+        },
       },
     },
   },

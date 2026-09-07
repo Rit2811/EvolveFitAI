@@ -49,9 +49,9 @@ workoutPlan and mealPlan must each contain Monday through Sunday exactly once.
 The number of non-rest days must exactly equal workout_days. Each non-rest day needs title, type, duration, intensity, isRestDay=false, and exercises.
 Each exercise needs name, equipment, sets, reps, restSeconds, instruction. equipment must exactly match one string from the profile equipment array. Never exceed workout_duration.
 Each rest day has isRestDay=true and an empty exercises array.
-Each meal day needs breakfast, lunch, dinner, snack, estimatedCalories, estimatedProtein.
+Each meal day needs a meals array plus estimatedCalories and estimatedProtein. Match profile.meal_schedule exactly: preserve every slot name and time in order, and provide one practical food string for each slot.
 Strictly respect diet_type. Never mention or include any allergy or disliked_food, even in warnings or substitutions.
-Treat avoided_exercises as hard exclusions. If workout_day_preferences is non-empty, schedule every active workout exactly on those weekdays.
+Treat avoided_exercises as hard exclusions. workout_day_preferences is optional: if it contains at least workout_days entries, place active workouts only on those preferred days; if it contains fewer, use every preferred day and distribute the remaining sessions across the week for recovery.
 Favor preferred_foods and preferred_exercises when they are compatible with the diet, allergies, equipment, experience, and safety constraints; they are preferences, not permission to violate a hard constraint.
 Keep guidance appropriate to experience and environment. Do not prescribe supplements, medication, extreme dieting, diagnosis, or rehabilitation.
 adaptationMessage should say the initial plan was created from the profile. adaptationReasons must be an empty array.`

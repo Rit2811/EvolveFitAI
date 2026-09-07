@@ -21,10 +21,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.tmp
-
-# Supabase local CLI state
-supabase/.temp/
-supabase/.branches/
+server/data/*.json
 
 # Editors, OS files, and local agent state
 .vscode/
@@ -37,3 +34,8 @@ Desktop.ini
 
 # Local source archives
 *.zip
+*.rar
+*.7z
+
+# Locally generated internship report and its private/demo artifacts
+report/

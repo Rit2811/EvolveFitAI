@@ -54,6 +54,6 @@ function validReasons(reasons) { return Array.isArray(reasons) && reasons.length
 
 const adaptationPrompt = `Adapt a seven-day general wellness plan using the profile, currentPlan, and checkIn. Return JSON only with summary, workoutPlan, mealPlan, adaptationMessage, adaptationReasons.
 Preserve exactly seven named days and the same number of active workout days. Every exercise equipment value must exactly match the profile equipment array. Never exceed workout_duration.
-Diet type, allergies, disliked foods, avoided exercises, equipment, selected workout weekdays, and availability are hard constraints. Never mention excluded foods. Preserve preferred foods and exercises where compatible.
+Diet type, meal schedule names and times, allergies, disliked foods, avoided exercises, equipment, preferred weekday scheduling, and availability are constraints. Never mention excluded foods. Preserve preferred foods and exercises where compatible.
 High soreness, low sleep/energy, or high stress must reduce sets, duration, intensity, impact, or emphasize recovery. Strong recovery allows only a small progression. Low diet adherence should simplify meals.
 Provide 2-4 concise adaptationReasons grounded in the check-in. Do not diagnose, prescribe treatment, recommend supplements, or provide rehabilitation advice.`

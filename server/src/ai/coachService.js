@@ -35,13 +35,14 @@ export function fallbackAnswer(message, profile, plan, checkIn, history = []) {
     const day = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date())
     const meals = plan?.mealPlan?.find((item) => item.day === day)
     if (!meals) return `Your ${profile.diet_type.toLowerCase()} preferences are saved, but there is no active meal plan to summarize yet.`
-    return `Today’s simple options are ${meals.breakfast} for breakfast, ${meals.lunch} for lunch, and ${meals.dinner} for dinner. These follow your saved diet and food exclusions.`
+    const slots = Array.isArray(meals.meals) ? meals.meals : [{ label: 'Breakfast', food: meals.breakfast }, { label: 'Lunch', food: meals.lunch }, { label: 'Dinner', food: meals.dinner }]
+    return `Today’s schedule is ${slots.map((slot) => `${slot.time ? `${slot.time} ` : ''}${slot.label}: ${slot.food}`).join('; ')}. These choices follow your saved diet, meal rhythm, and food exclusions.`
   }
   if (/recover|readiness|sleep|sore|stress|energy/.test(question)) {
-    if (!checkIn) return 'Complete a daily check-in first so I can ground recovery guidance in your sleep, energy, soreness, and stress.'
+    if (!checkIn) return 'Complete a weekly check-in entry first so I can ground recovery guidance in your sleep, energy, soreness, and stress.'
     return `Your latest readiness score is ${checkIn.readiness_score}/100. Energy was ${checkIn.energy}/5, sleep was ${checkIn.sleep_hours} hours, and soreness was ${checkIn.soreness}/5. Follow the active plan’s intensity and avoid adding extra maximal work.`
   }
-  return `For your ${profile.goal.toLowerCase()} goal, the best next step is to follow today’s active plan and use the daily check-in when recovery or adherence changes. I’ll keep guidance within your saved equipment and ${profile.diet_type.toLowerCase()} preferences.`
+  return `For your ${profile.goal.toLowerCase()} goal, the best next step is to follow today’s active plan and log the day in your weekly check-in. If the plan needs work, use Tune this plan so changes happen only when you ask. I’ll keep guidance within your saved equipment and ${profile.diet_type.toLowerCase()} preferences.`
 }
 
 function sanitizeHistory(history) {
@@ -52,4 +53,4 @@ function sanitizeHistory(history) {
     .slice(-8)
 }
 
-const coachPrompt = `You are EvolveFit AI, a clear general wellness coach. Directly answer the latest question in the supplied question field. Use conversationHistory only to understand follow-up references; never repeat an earlier answer or switch to a different topic unless the latest question asks you to. Give a complete answer, normally in 3-8 concise sentences, using only the supplied profile, activePlan, and latestCheckIn. Use readable paragraphs or short bullets when helpful. Do not invent data. Respect diet, allergy, disliked-food, preferred-food, equipment, preferred/avoided-exercise, selected-weekday, duration, and experience constraints. Do not diagnose, treat, prescribe medication or supplements, provide rehabilitation instructions, or make medical claims. For pain, injury, or medical questions, recommend pausing and consulting a qualified healthcare professional. Never recommend extreme diets or maximal training. Explain plan changes using adaptationMessage and adaptationReasons when available.`
+const coachPrompt = `You are EvolveFit AI, a clear general wellness coach. Directly answer the latest question in the supplied question field. Use conversationHistory only to understand follow-up references; never repeat an earlier answer or switch to a different topic unless the latest question asks you to. Give a complete answer, normally in 3-8 concise sentences, using only the supplied profile, activePlan, and latestCheckIn. Use readable paragraphs or short bullets when helpful. Do not invent data. Enforce diet, allergy, disliked-food, equipment, avoided-exercise, duration, and safety limits. Treat preferred foods, exercises, and weekdays as preferences rather than guarantees. Do not diagnose, treat, prescribe medication or supplements, provide rehabilitation instructions, or make medical claims. For pain, injury, or medical questions, recommend pausing and consulting a qualified healthcare professional. Never recommend extreme diets or maximal training. Explain plan changes using adaptationMessage and adaptationReasons when available.`

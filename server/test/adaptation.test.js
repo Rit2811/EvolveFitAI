@@ -4,7 +4,7 @@ import { adaptPlan, createFallbackAdaptation } from '../src/ai/adaptPlanService.
 import { createFallbackPlan } from '../src/ai/fallbackPlan.js'
 import { validatePlan } from '../src/ai/planValidator.js'
 
-const profile = { goal: 'Build muscle', experience: 'Beginner', workout_days: 4, workout_duration: 45, workout_environment: 'Home', equipment: ['Dumbbells'], diet_type: 'Vegetarian', allergies: ['Peanuts'], disliked_foods: ['Mushrooms'], cooking_preference: 'Quick and simple' }
+const profile = { full_name: 'Demo Person', age: 28, gender: 'Prefer not to say', height_cm: 172, weight_kg: 70, goal: 'Build muscle', experience: 'Beginner', workout_days: 4, workout_duration: 45, workout_environment: 'Home', equipment: ['Dumbbells'], diet_type: 'Vegetarian', allergies: ['Peanuts'], disliked_foods: ['Mushrooms'], meal_schedule: [{ name: 'Breakfast', time: '08:00' }, { name: 'Lunch', time: '13:00' }, { name: 'Dinner', time: '19:30' }] }
 const checkIn = { energy: 2, sleep_hours: 5, sleep_quality: 2, soreness: 5, stress: 4, hunger: 3, diet_adherence: 3, readiness_score: 28, workout_completed: false, notes: '' }
 
 test('low-recovery fallback adaptation reduces load and preserves constraints', () => {

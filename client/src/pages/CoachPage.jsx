@@ -1,16 +1,20 @@
 import { AlertCircle, Bot, LoaderCircle, MessageSquare, Plus, Send, Sparkles, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../context/auth'
+import { useWellness } from '../context/wellness'
 import { useWellnessData } from '../hooks/useWellnessData'
 import { askCoach } from '../lib/api'
-import { createConversation, MAX_COACH_CHATS, parseChatStore, readChatStore, titleForQuestion, updateConversation } from '../lib/coachSessions'
+import { createConversation, MAX_COACH_CHATS, readChatStore, titleForQuestion, updateConversation } from '../lib/coachSessions'
+import { planMatchesProfile } from '../lib/planData'
+import { latestCheckIn } from '../lib/wellnessData'
 
 const COACH_TIMEOUT_MS = 60_000
-const suggestions = ['Why did my plan change?', 'What is my workout today?', 'How should I approach recovery?', 'Summarize today’s meals']
+const suggestions = ['What is my workout today?', 'Summarize today’s timed meals', 'What patterns do you see in my latest check-in?', 'What plan tweak could improve consistency?', 'How do my favorites shape this plan?']
 
 export default function CoachPage() {
-  const { user, profile } = useAuth()
-  const { plan, checkIns, loading, error: dataError } = useWellnessData(user.id)
+  const { user } = useAuth()
+  const { profile } = useWellness()
+  const { plan, checkIns, loading, error: dataError } = useWellnessData()
   const storageKey = useMemo(() => `evolvefit:coach:${user.id}`, [user.id])
   const [message, setMessage] = useState('')
   const [chatStore, setChatStore] = useState(() => readChatStore(storageKey))
@@ -34,9 +38,7 @@ export default function CoachPage() {
 
   useEffect(() => {
     function syncHistory(event) {
-      if (event.key === storageKey && event.newValue) {
-        setChatStore(parseChatStore(event.newValue, { discardPending: false }))
-      }
+      if (event.key === storageKey && event.newValue) setChatStore(readChatStore(storageKey))
     }
     window.addEventListener('storage', syncHistory)
     return () => window.removeEventListener('storage', syncHistory)
@@ -94,8 +96,8 @@ export default function CoachPage() {
       const response = await askCoach(
         question,
         profile,
-        plan ? normalizePlan(plan) : null,
-        checkIns.at(-1) || null,
+        plan && planMatchesProfile(plan, profile) ? normalizePlan(plan) : null,
+        latestCheckIn(checkIns),
         conversationHistory,
         controller.signal,
       )

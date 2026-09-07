@@ -14,13 +14,13 @@ export function buildDailyReport(checkIn) {
   if (Number(checkIn.sleep_hours) < 7) improvements.push(`Aim for a more consistent sleep window; ${checkIn.sleep_hours} hours may limit recovery.`)
   if (Number(checkIn.sleep_quality) <= 2) improvements.push('Keep the evening routine simple and consistent to support better sleep quality.')
   if (Number(checkIn.energy) <= 2) improvements.push('Use the easier end of the planned intensity and prioritize clean technique over volume.')
-  if (Number(checkIn.soreness) >= 4) improvements.push('Keep today low impact and avoid adding sets beyond the adapted plan.')
+  if (Number(checkIn.soreness) >= 4) improvements.push('Keep today low impact and avoid adding sets beyond the planned session.')
   if (Number(checkIn.stress) >= 4) improvements.push('Protect a short recovery break today and keep training expectations realistic.')
   if (Number(checkIn.diet_adherence) <= 2) improvements.push('Prepare one simple planned meal in advance rather than trying to perfect the full day.')
   if (Number(checkIn.hunger) >= 4) improvements.push('Use regular balanced meals from the plan instead of allowing long gaps between meals.')
   if (!checkIn.workout_completed) improvements.push('Resume with the next planned session; do not double the workload to make up for one missed day.')
 
-  if (!positives.length) positives.push('Completing the check-in is useful progress because it keeps the plan responsive to real conditions.')
+  if (!positives.length) positives.push('Completing the check-in is useful progress because it makes real patterns visible over time.')
   if (!improvements.length) improvements.push('Keep the same routine today and avoid unnecessary changes while recovery is steady.')
 
   const level = score >= 80 ? 'Strong readiness' : score >= 60 ? 'Steady readiness' : score >= 40 ? 'Recovery needs attention' : 'Recovery-first day'
@@ -28,7 +28,7 @@ export function buildDailyReport(checkIn) {
     ? 'Your signals support following the planned session with normal effort and controlled technique.'
     : score >= 60
       ? 'Most signals are manageable. Follow the plan as written and stay toward the comfortable end of the intensity range.'
-      : 'Today is better used for consistency than intensity. Follow the adapted workload and give recovery signals priority.'
+      : 'Today is better used for consistency than intensity. Stay conservative and give recovery signals priority.'
 
   return {
     title: level,
@@ -36,12 +36,12 @@ export function buildDailyReport(checkIn) {
     summary,
     positives: positives.slice(0, 3),
     improvements: improvements.slice(0, 4),
-    focus: score >= 80 ? 'Execute the plan well; more is not automatically better.' : score >= 60 ? 'Keep effort controlled and maintain the routine.' : 'Reduce pressure, follow the lighter plan, and reassess at the next check-in.',
+    focus: score >= 80 ? 'Execute the plan well; more is not automatically better.' : score >= 60 ? 'Keep effort controlled and maintain the routine.' : 'Reduce pressure, choose the conservative option, and reassess at the next check-in.',
     createdAt: checkIn.created_at || new Date().toISOString(),
   }
 }
 
-export function downloadDailyReportPdf(report, checkIn, fullName = 'EvolveFit user') {
+export function downloadDailyReportPdf(report, checkIn, fullName = 'EvolveFit profile') {
   if (!report) return
   const lines = [
     ['EvolveFit AI - Daily Wellness Report', 18],

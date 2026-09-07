@@ -1,14 +1,24 @@
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 export function validateProfile(profile) {
-  const required = ['goal', 'experience', 'workout_environment', 'diet_type', 'cooking_preference']
+  const required = ['full_name', 'gender', 'goal', 'experience', 'workout_environment', 'diet_type']
   if (!profile || required.some((key) => typeof profile[key] !== 'string' || !profile[key].trim())) return 'Profile is incomplete.'
-  if (!Number.isInteger(Number(profile.workout_days)) || Number(profile.workout_days) < 1 || Number(profile.workout_days) > 7) return 'Workout days must be between 1 and 7.'
-  if (!Number.isFinite(Number(profile.workout_duration)) || Number(profile.workout_duration) < 15 || Number(profile.workout_duration) > 120) return 'Workout duration must be between 15 and 120 minutes.'
+  if (profile.full_name.trim().length < 2) return 'Name is too short.'
+  if (!inRange(profile.age, 18, 100) || !inRange(profile.height_cm, 100, 250) || !inRange(profile.weight_kg, 30, 350)) return 'Age, height, or weight is outside the supported range.'
+  if (!['Woman', 'Man', 'Non-binary', 'Prefer not to say'].includes(profile.gender)) return 'Gender selection is invalid.'
+  if (!['Build muscle', 'Lose fat', 'Improve fitness', 'Maintain wellness'].includes(profile.goal)) return 'Goal is invalid.'
+  if (!['Beginner', 'Intermediate', 'Advanced'].includes(profile.experience)) return 'Training experience is invalid.'
+  if (!['Home', 'Gym', 'Outdoors', 'Mixed'].includes(profile.workout_environment)) return 'Training location is invalid.'
+  if (!['No dietary restrictions', 'Vegetarian', 'Vegan', 'Pescatarian'].includes(profile.diet_type)) return 'Diet pattern is invalid.'
+  if (!Number.isInteger(Number(profile.workout_days)) || Number(profile.workout_days) < 1 || Number(profile.workout_days) > 6) return 'Weekly workout target must be between 1 and 6.'
+  if (!Number.isFinite(Number(profile.workout_duration)) || Number(profile.workout_duration) < 15 || Number(profile.workout_duration) > 90) return 'Workout duration must be between 15 and 90 minutes.'
+  const mealSchedule = resolveMealSchedule(profile)
+  if (mealSchedule.length < 2 || mealSchedule.length > 6 || mealSchedule.some((slot, index) => typeof slot.name !== 'string' || !slot.name.trim() || !/^([01]\d|2[0-3]):[0-5]\d$/.test(slot.time) || (index > 0 && slot.time <= mealSchedule[index - 1].time))) return 'Daily meal schedule is invalid or not in chronological order.'
   if (!Array.isArray(profile.equipment) || profile.equipment.length === 0) return 'At least one equipment option is required.'
+  const allowedEquipment = ['Bodyweight', 'Dumbbells', 'Resistance bands', 'Barbell', 'Bench', 'Pull-up bar', 'Cardio machine', 'Kettlebell']
+  if (profile.equipment.some((item) => !allowedEquipment.includes(item)) || new Set(profile.equipment).size !== profile.equipment.length) return 'Equipment selection is invalid.'
   const selectedDays = profile.workout_day_preferences || []
   if (!Array.isArray(selectedDays) || selectedDays.some((day) => !DAYS.includes(day)) || new Set(selectedDays).size !== selectedDays.length) return 'Preferred workout days are invalid.'
-  if (selectedDays.length && selectedDays.length !== Number(profile.workout_days)) return 'Preferred workout days must match the selected days per week.'
   return ''
 }
 
@@ -24,7 +34,9 @@ export function validatePlan(plan, profile) {
     const active = plan.workoutPlan.filter((day) => !day.isRestDay)
     if (active.length !== Number(profile.workout_days)) errors.push('Workout-day count does not match the profile.')
     const selectedDays = profile.workout_day_preferences || []
-    if (selectedDays.length && (active.some((day) => !selectedDays.includes(day.day)) || selectedDays.some((day) => !active.find((item) => item.day === day)))) errors.push('Workout schedule does not match the preferred weekdays.')
+    const activeNames = active.map((day) => day.day)
+    if (selectedDays.length >= active.length && activeNames.some((day) => !selectedDays.includes(day))) errors.push('Workout schedule does not prioritize the available weekdays.')
+    if (selectedDays.length < active.length && selectedDays.some((day) => !activeNames.includes(day))) errors.push('Workout schedule omitted an available weekday.')
     for (const day of active) {
       if (!Array.isArray(day.exercises) || day.exercises.length === 0) errors.push(`${day.day || 'Workout day'} needs exercises.`)
       if (!Number.isFinite(Number(day.duration)) || Number(day.duration) > Number(profile.workout_duration)) errors.push(`${day.day || 'Workout day'} exceeds available duration.`)
@@ -40,7 +52,12 @@ export function validatePlan(plan, profile) {
 
   if (Array.isArray(plan.mealPlan)) {
     for (const meal of plan.mealPlan) {
-      for (const field of ['breakfast', 'lunch', 'dinner', 'snack']) if (!nonEmpty(meal[field])) errors.push(`${meal.day || 'Meal day'} is missing ${field}.`)
+      const expected = resolveMealSchedule(profile)
+      if (!Array.isArray(meal.meals) || meal.meals.length !== expected.length) errors.push(`${meal.day || 'Meal day'} does not match the meal schedule.`)
+      for (const [index, slot] of (meal.meals || []).entries()) {
+        if (!nonEmpty(slot.label) || !nonEmpty(slot.time) || !nonEmpty(slot.food)) errors.push(`${meal.day || 'Meal day'} has an incomplete meal slot.`)
+        if (expected[index] && (normalize(slot.label) !== normalize(expected[index].name) || slot.time !== expected[index].time)) errors.push(`${meal.day || 'Meal day'} changed the requested meal schedule.`)
+      }
       if (!Number.isFinite(Number(meal.estimatedCalories)) || !Number.isFinite(Number(meal.estimatedProtein))) errors.push(`${meal.day || 'Meal day'} needs nutrition estimates.`)
     }
   }
@@ -54,6 +71,13 @@ export function validatePlan(plan, profile) {
   return { valid: errors.length === 0, errors }
 }
 
+export function resolveMealSchedule(profile) {
+  if (Array.isArray(profile?.meal_schedule) && profile.meal_schedule.length) return profile.meal_schedule
+  const legacy = [{ name: 'Breakfast', time: '08:00' }, { name: 'Lunch', time: '13:00' }, { name: 'Dinner', time: '19:30' }]
+  if (Number(profile?.meals_per_day) >= 4) legacy.splice(2, 0, { name: 'Afternoon snack', time: '16:30' })
+  return legacy
+}
+
 function validateDays(items, label, errors) {
   if (!Array.isArray(items) || items.length !== 7) { errors.push(`${label} plan must contain seven days.`); return }
   const names = items.map((item) => item?.day)
@@ -63,6 +87,7 @@ function equipmentAllowed(value, available) { if (!nonEmpty(value)) return false
 function normalize(value) { return String(value).trim().toLowerCase() }
 function containsPreference(value, preference) { const needle = normalize(preference); return Boolean(needle && normalize(value).includes(needle)) }
 function nonEmpty(value) { return typeof value === 'string' && value.trim().length > 0 }
+function inRange(value, min, max) { const number = Number(value); return Number.isFinite(number) && number >= min && number <= max }
 function dietAllowed(text, diet) {
   const type = normalize(diet)
   const meat = ['chicken', 'turkey', 'beef', 'pork', 'lamb', 'fish', 'salmon', 'tuna', 'prawn', 'shrimp']

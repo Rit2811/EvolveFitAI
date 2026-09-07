@@ -1,68 +1,89 @@
-import { AlertCircle, Apple, CalendarDays, CheckCircle2, ChefHat, Clock3, Dumbbell, Flame, Gauge, Leaf, LoaderCircle, MoonStar, Sparkles, Utensils } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { AlertCircle, CalendarDays, CheckCircle2, Clock3, Dumbbell, Flame, Gauge, LayoutGrid, ListFilter, LoaderCircle, MoonStar, RefreshCw, Sparkles, Utensils, WandSparkles } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../context/auth'
-import { generatePlan, isCompletePlan } from '../lib/api'
-import { supabase } from '../lib/supabase'
+import { useWellness } from '../context/wellness'
+import { generatePlan, isCompletePlan, tweakPlan as requestPlanTweak } from '../lib/api'
+import { generatedPlanRow, planFromRow, planMatchesProfile } from '../lib/planData'
+import { checkInDate, currentWeekDates, dayName, localDateKey } from '../lib/wellnessData'
 
 export default function PlanGenerationPage() {
-  const { user, profile } = useAuth()
-  const [plan, setPlan] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { profile, plan: savedPlan, checkIns, savePlan } = useWellness()
   const [generating, setGenerating] = useState(false)
-  const [error, setError] = useState('')
+  const completeSavedPlan = savedPlan ? planFromRow(savedPlan) : null
+  const savedPlanIsValid = !completeSavedPlan || isCompletePlan(completeSavedPlan)
+  const planSynced = Boolean(savedPlan && planMatchesProfile(savedPlan, profile))
+  const [error, setError] = useState(savedPlanIsValid ? '' : 'Your saved plan is incomplete. Start a new session to create another plan.')
   const [fallback, setFallback] = useState(false)
-  const [generationBlocked, setGenerationBlocked] = useState(false)
-
-  useEffect(() => {
-    let active = true
-    supabase.from('plans').select('*').eq('user_id', user.id).eq('is_active', true).order('created_at', { ascending: false }).limit(1).maybeSingle().then(({ data, error: loadError }) => {
-      if (!active) return
-      if (loadError) { setError(planError(loadError)); setGenerationBlocked(true) }
-      else if (data) {
-        const savedPlan = fromRow(data)
-        if (isCompletePlan(savedPlan)) setPlan(savedPlan)
-        else { setError('Your saved plan is incomplete. Please contact support before generating another plan.'); setGenerationBlocked(true) }
-      }
-      setLoading(false)
-    })
-    return () => { active = false }
-  }, [user.id])
+  const [tweaking, setTweaking] = useState(false)
+  const [tweakError, setTweakError] = useState('')
 
   async function createPlan() {
     setGenerating(true); setError(''); setFallback(false)
     try {
       const generated = await generatePlan(profile)
-      const { source, ...content } = generated
-      const row = { user_id: user.id, workout_plan: content.workoutPlan, meal_plan: content.mealPlan, summary: content.summary, adaptation_message: content.adaptationMessage, adaptation_reasons: content.adaptationReasons || [], version: 1, is_active: true }
-      const { data, error: saveError } = await supabase.from('plans').insert(row).select().single()
-      if (saveError) throw new Error(planError(saveError))
-      setPlan(fromRow(data)); setFallback(source === 'fallback')
+      await savePlan(generatedPlanRow(generated, profile, savedPlan ? Number(savedPlan.version || 0) + 1 : 1)); setFallback(generated.source === 'fallback')
     } catch (generationError) { setError(generationError.message || 'We could not generate your plan. Please try again.') }
     finally { setGenerating(false) }
   }
 
-  if (loading) return <GenerationSkeleton label="Loading your active plan" />
+  async function applyTweak(request) {
+    setTweaking(true); setTweakError('')
+    try {
+      const adjusted = await requestPlanTweak(profile, planFromRow(savedPlan), request)
+      await savePlan(generatedPlanRow(adjusted, profile, Number(savedPlan.version || 0) + 1))
+      setFallback(adjusted.source === 'fallback')
+    } catch (adjustmentError) { setTweakError(adjustmentError.message || 'The plan could not be adjusted.') }
+    finally { setTweaking(false) }
+  }
+
   if (generating) return <GenerationSkeleton label="Building your personalized week" generating />
-  if (plan) return <PlanExperience plan={plan} profile={profile} fallback={fallback} />
-  return <EmptyPlan profile={profile} error={error} onGenerate={createPlan} generationBlocked={generationBlocked} />
+  if (completeSavedPlan && savedPlanIsValid) return <PlanExperience plan={completeSavedPlan} profile={profile} checkIns={checkIns} synced={planSynced} fallback={fallback} onSync={createPlan} onTweak={applyTweak} tweaking={tweaking} tweakError={tweakError} />
+  return <EmptyPlan profile={profile} error={error} onGenerate={createPlan} />
 }
 
-function EmptyPlan({ profile, error, onGenerate, generationBlocked }) {
-  return <section className="mx-auto max-w-4xl"><p className="text-sm font-semibold uppercase tracking-wider text-wellness-primary">Your weekly plan</p><h1 className="mt-2 text-3xl font-bold sm:text-4xl">Ready when you are, {profile.full_name?.split(' ')[0]}.</h1><p className="mt-3 max-w-2xl leading-7 text-wellness-muted">We will build seven days of workouts and meals around your availability and preferences.</p><div className="mt-8 rounded-2xl border bg-white p-6 shadow-card sm:p-8"><div className="grid gap-4 sm:grid-cols-3"><Constraint icon={Dumbbell} label="Training" value={`${profile.workout_days} days · ${profile.workout_duration} min`} /><Constraint icon={CalendarDays} label="Goal" value={profile.goal} /><Constraint icon={Utensils} label="Nutrition" value={profile.diet_type} /></div><div className="mt-7 rounded-xl bg-wellness-background p-4 text-sm leading-6 text-wellness-muted">Your equipment, allergies, disliked foods, experience level, and cooking preference are treated as fixed constraints.</div>{error && <ErrorNotice message={error} />}{!generationBlocked && <button onClick={onGenerate} className="mt-7 inline-flex h-12 items-center gap-2 rounded-xl bg-wellness-primary px-6 font-semibold text-white"><Sparkles size={19} />Generate my plan</button>}</div></section>
+function EmptyPlan({ profile, error, onGenerate }) {
+  return <section className="mx-auto max-w-4xl"><p className="text-sm font-semibold uppercase tracking-wider text-wellness-primary">Your weekly plan</p><h1 className="mt-2 text-3xl font-bold sm:text-4xl">Ready when you are, {profile.full_name?.split(' ')[0]}.</h1><p className="mt-3 max-w-2xl leading-7 text-wellness-muted">We will build seven days of workouts and meals around your availability and real meal schedule.</p><div className="mt-8 rounded-2xl border bg-white p-6 shadow-card sm:p-8"><div className="grid gap-4 sm:grid-cols-3"><Constraint icon={Dumbbell} label="Training target" value={`${profile.workout_days} days · up to ${profile.workout_duration} min`} /><Constraint icon={CalendarDays} label="Goal" value={profile.goal} /><Constraint icon={Utensils} label="Nutrition" value={profile.diet_type} /></div><div className="mt-7 rounded-xl bg-wellness-background p-4 text-sm leading-6 text-wellness-muted">Equipment, time limits, meal times, allergies, excluded foods, and avoided exercises are enforced. Your selected favorites guide the plan where compatible.</div>{error && <ErrorNotice message={error} />}<button onClick={onGenerate} className="mt-7 inline-flex h-12 items-center gap-2 rounded-xl bg-wellness-primary px-6 font-semibold text-white"><Sparkles size={19} />Generate my plan</button></div></section>
 }
 
-function PlanExperience({ plan, profile, fallback }) {
+function PlanExperience({ plan, profile, checkIns, synced, fallback, onSync, onTweak, tweaking, tweakError }) {
+  const today = dayName()
+  const [selectedDay, setSelectedDay] = useState(() => plan.workoutPlan.some((item) => item.day === today) ? today : plan.workoutPlan[0].day)
+  const [view, setView] = useState('focus')
   const [tab, setTab] = useState('workouts')
   const activeDays = plan.workoutPlan.filter((day) => !day.isRestDay).length
-  return <section className="min-w-0"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-semibold uppercase tracking-wider text-wellness-primary">Active weekly plan</p><h1 className="mt-2 text-3xl font-bold sm:text-4xl">Your personalized week</h1><p className="mt-2 text-wellness-muted">Built for {profile.goal?.toLowerCase()} with your schedule and preferences in mind.</p></div><div className="flex flex-wrap gap-2"><MetaPill label={`Version ${plan.version}`} /><MetaPill label={formatDate(plan.createdAt)} /><MetaPill label={profile.goal} /></div></div>
-    {fallback && <div className="mt-6 flex gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800"><CheckCircle2 className="shrink-0" size={19} />Demo plan generated using the local fallback.</div>}
-    <PreferenceSummary profile={profile} />
-    <div className="mt-6 grid gap-5 xl:grid-cols-[1.35fr_0.65fr]"><div className="rounded-2xl border bg-white p-6 shadow-card"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-green-50 text-wellness-primary"><Sparkles size={21} /></span><div><p className="text-xs font-semibold uppercase tracking-wide text-wellness-muted">Weekly strategy</p><h2 className="font-semibold">A practical path toward {profile.goal?.toLowerCase()}</h2></div></div><p className="mt-4 leading-7 text-wellness-muted">{plan.summary}</p></div><div className="grid grid-cols-2 gap-3"><Constraint icon={Dumbbell} label="Training" value={`${activeDays} days`} /><Constraint icon={Utensils} label="Meals" value="7 days" /></div></div>
-    <AdaptationCard message={plan.adaptationMessage} reasons={plan.adaptationReasons} />
-    <div className="mt-8 flex w-full max-w-md rounded-xl border bg-white p-1" role="tablist" aria-label="Plan type"><Tab active={tab === 'workouts'} onClick={() => setTab('workouts')} icon={Dumbbell}>Workouts</Tab><Tab active={tab === 'meals'} onClick={() => setTab('meals')} icon={Utensils}>Meals</Tab></div>
-    <div className="mt-5"><div className="mb-4"><h2 className="text-2xl font-bold">{tab === 'workouts' ? 'Workout schedule' : 'Meal schedule'}</h2><p className="mt-1 text-sm text-wellness-muted">All seven days, planned around your {tab === 'workouts' ? `${profile.workout_duration}-minute availability` : `${profile.diet_type?.toLowerCase()} preferences`}.</p></div>{tab === 'workouts' ? <WorkoutGrid days={plan.workoutPlan} /> : <MealGrid days={plan.mealPlan} />}</div>
+  const trainingMinutes = plan.workoutPlan.reduce((total, day) => total + Number(day.duration || 0), 0)
+  const mealSlots = plan.mealPlan[0]?.meals?.length || 0
+  const workout = plan.workoutPlan.find((item) => item.day === selectedDay)
+  const meals = plan.mealPlan.find((item) => item.day === selectedDay)
+  const dates = currentWeekDates()
+  const checkInMap = new Map(checkIns.map((item) => [checkInDate(item), item]))
+  const selectedDate = dates.find((date) => dayName(date) === selectedDay)
+  const selectedCheckIn = selectedDate ? checkInMap.get(localDateKey(selectedDate)) : null
+
+  return <section className="min-w-0"><header className="overflow-hidden rounded-3xl bg-gradient-to-br from-green-950 via-green-800 to-lime-700 p-6 text-white shadow-xl sm:p-8"><div className="flex flex-wrap items-start justify-between gap-6"><div className="max-w-2xl"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-wide">Active weekly plan</span><span className={`rounded-full px-3 py-1 text-xs font-bold ${synced ? 'bg-lime-300 text-green-950' : 'bg-amber-300 text-amber-950'}`}>{synced ? 'Synced with profile' : 'Sync required'}</span></div><h1 className="mt-5 text-3xl font-black sm:text-5xl">Your week, made actionable.</h1><p className="mt-4 max-w-xl leading-7 text-green-100">{plan.summary}</p></div><div className="flex flex-wrap gap-2"><DarkPill label={`Version ${plan.version}`} /><DarkPill label={formatDate(plan.createdAt)} /></div></div><div className="mt-8 grid grid-cols-3 gap-3"><PlanStat value={activeDays} label="Training days" /><PlanStat value={`${trainingMinutes} min`} label="Weekly training" /><PlanStat value={mealSlots} label="Daily meal slots" /></div></header>
+    {!synced && <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-amber-300 bg-amber-50 p-5 text-sm text-amber-900"><div><p className="font-bold">Your profile and plan are out of sync.</p><p className="mt-1 text-amber-800">Syncing rebuilds this plan from the profile values currently shown across the app.</p></div><button type="button" onClick={onSync} className="inline-flex h-11 items-center gap-2 rounded-xl bg-amber-900 px-4 font-semibold text-white"><RefreshCw size={17} />Sync plan now</button></div>}
+    {fallback && <div className="mt-5 flex gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800"><CheckCircle2 className="shrink-0" size={19} />This version was generated locally and still follows your saved constraints.</div>}
+    <WeekNavigator workouts={plan.workoutPlan} meals={plan.mealPlan} dates={dates} checkInMap={checkInMap} selectedDay={selectedDay} onSelect={setSelectedDay} />
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-wider text-wellness-primary">Plan workspace</p><h2 className="mt-1 text-2xl font-bold">{view === 'focus' ? `${selectedDay} focus` : 'Complete week'}</h2></div><div className="flex rounded-xl border bg-white p-1"><ViewButton active={view === 'focus'} onClick={() => setView('focus')} icon={ListFilter}>Day focus</ViewButton><ViewButton active={view === 'week'} onClick={() => setView('week')} icon={LayoutGrid}>Full week</ViewButton></div></div>
+    {view === 'focus' ? <DayFocus day={selectedDay} workout={workout} meals={meals} checkIn={selectedCheckIn} onTweak={onTweak} tweaking={tweaking || !synced} /> : <FullWeek tab={tab} setTab={setTab} plan={plan} />}
+    <TweakPanel selectedDay={selectedDay} synced={synced} onTweak={onTweak} tweaking={tweaking} error={tweakError} />
+    <div className="mt-5 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]"><AdaptationCard message={plan.adaptationMessage} reasons={plan.adaptationReasons} /><PreferenceSummary profile={profile} /></div>
   </section>
+}
+
+function WeekNavigator({ workouts, meals, dates, checkInMap, selectedDay, onSelect }) {
+  return <section className="mt-6 rounded-3xl border bg-white p-4 shadow-card sm:p-5"><div className="mb-4 flex items-center justify-between gap-3"><div><h2 className="font-bold">This week at a glance</h2><p className="mt-1 text-xs text-wellness-muted">Select a day to see exactly what to do.</p></div><CalendarDays className="text-wellness-primary" size={22} /></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">{workouts.map((workout) => { const mealDay = meals.find((item) => item.day === workout.day); const date = dates.find((item) => dayName(item) === workout.day); const checkIn = date ? checkInMap.get(localDateKey(date)) : null; const active = selectedDay === workout.day; return <button type="button" key={workout.day} onClick={() => onSelect(workout.day)} className={`min-w-0 rounded-2xl border p-3 text-left transition ${active ? 'border-wellness-primary bg-wellness-primary text-white shadow-lg' : checkIn ? 'border-lime-300 bg-lime-50 hover:border-wellness-primary' : 'bg-wellness-background hover:border-wellness-primary'}`}><div className="flex items-center justify-between gap-2"><span className={`text-[10px] font-black uppercase tracking-wider ${active ? 'text-green-100' : 'text-wellness-muted'}`}>{workout.day.slice(0, 3)}</span>{checkIn && <CheckCircle2 size={15} className={active ? 'text-lime-200' : 'text-wellness-primary'} />}</div><p className="mt-2 truncate text-sm font-bold">{workout.isRestDay ? 'Recovery' : workout.title}</p><p className={`mt-1 text-[11px] ${active ? 'text-green-100' : 'text-wellness-muted'}`}>{workout.isRestDay ? 'Rest day' : `${workout.duration} min`} · {mealDay?.meals?.length || 0} meals</p></button> })}</div></section>
+}
+
+function DayFocus({ day, workout, meals, checkIn, onTweak, tweaking }) {
+  const actions = workout?.isRestDay
+    ? [`Refresh ${day}'s meals using my saved food preferences`]
+    : [`Make only ${day}'s workout easier`, `Shorten only ${day}'s workout`, `Refresh only ${day}'s exercises using my saved favorites`, `Refresh ${day}'s meals using my saved food preferences`]
+  return <div className="mt-5"><div className={`mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4 ${checkIn ? 'border-green-200 bg-green-50' : 'bg-white'}`}><div><p className="text-xs font-bold uppercase tracking-wide text-wellness-muted">{checkIn ? 'Day logged' : 'Planned day'}</p><p className="mt-1 font-semibold">{checkIn ? `Readiness ${checkIn.readiness_score}/100 · ${checkIn.workout_completed ? 'Workout completed' : 'Workout not completed'}` : 'Complete the day, then record it in your check-in.'}</p></div><Link to="/check-in" className="rounded-xl border border-green-200 bg-white px-4 py-2 text-sm font-semibold text-wellness-primary">{checkIn ? 'Review check-in' : 'Check in'}</Link></div><div className="grid min-w-0 gap-5 xl:grid-cols-[1.08fr_0.92fr]"><WorkoutCard day={workout} /><MealCard day={meals} /></div><div className="mt-4 rounded-2xl border border-lime-200 bg-lime-50 p-4"><p className="text-xs font-bold uppercase tracking-wide text-wellness-primary">Quick customize {day}</p><div className="mt-3 flex flex-wrap gap-2">{actions.map((action) => <button type="button" key={action} disabled={tweaking} onClick={() => onTweak(action)} className="rounded-full border border-green-200 bg-white px-3 py-2 text-xs font-semibold text-wellness-primary disabled:opacity-50">{action.replace(` only ${day}'s`, '').replace(` ${day}'s`, '')}</button>)}</div></div></div>
+}
+
+function FullWeek({ tab, setTab, plan }) {
+  return <div className="mt-5"><div className="flex w-full max-w-md rounded-xl border bg-white p-1" role="tablist" aria-label="Plan type"><Tab active={tab === 'workouts'} onClick={() => setTab('workouts')} icon={Dumbbell}>Workouts</Tab><Tab active={tab === 'meals'} onClick={() => setTab('meals')} icon={Utensils}>Meals</Tab></div><div className="mt-5">{tab === 'workouts' ? <WorkoutGrid days={plan.workoutPlan} /> : <MealGrid days={plan.mealPlan} />}</div></div>
 }
 
 function WorkoutGrid({ days }) { return <div className="grid min-w-0 gap-4 xl:grid-cols-2">{days.map((day) => <WorkoutCard key={day.day} day={day} />)}</div> }
@@ -73,15 +94,22 @@ function WorkoutCard({ day }) {
 function ExerciseRow({ exercise }) { return <div className="min-w-0 py-4"><div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><h4 className="break-words text-sm font-semibold">{exercise.name}</h4><p className="mt-1 text-xs text-wellness-muted">{exercise.equipment}</p></div><span className="shrink-0 rounded-lg bg-green-50 px-2.5 py-1 text-xs font-bold text-wellness-primary">{exercise.sets} × {exercise.reps}</span></div><p className="mt-2 break-words text-sm leading-6 text-wellness-muted">{exercise.instruction}</p><p className="mt-2 text-xs font-medium text-wellness-muted">Rest {exercise.restSeconds} seconds</p></div> }
 
 function MealGrid({ days }) { return <div className="grid min-w-0 gap-4 xl:grid-cols-2">{days.map((day) => <MealCard key={day.day} day={day} />)}</div> }
-function MealCard({ day }) { const meals = [[Apple, 'Breakfast', day.breakfast], [Leaf, 'Lunch', day.lunch], [ChefHat, 'Dinner', day.dinner], [Utensils, 'Snack', day.snack]]; return <article className="min-w-0 overflow-hidden rounded-2xl border bg-white shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3 border-b bg-wellness-background p-5"><div><span className="text-sm font-bold text-wellness-primary">{day.day}</span><h3 className="mt-1 text-lg font-semibold">Daily meals</h3></div><div className="text-right text-xs font-semibold text-wellness-muted"><p className="flex items-center justify-end gap-1"><Flame size={14} />~{day.estimatedCalories} kcal</p><p className="mt-1">~{day.estimatedProtein}g protein</p></div></div><div className="divide-y px-5">{meals.map(([Icon, label, meal]) => <div key={label} className="flex min-w-0 gap-3 py-4"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-green-50 text-wellness-primary"><Icon size={17} /></span><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-wellness-muted">{label}</p><p className="mt-1 break-words text-sm font-medium leading-6">{meal}</p></div></div>)}</div></article> }
+function MealCard({ day }) { return <article className="min-w-0 overflow-hidden rounded-2xl border bg-white shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3 border-b bg-wellness-background p-5"><div><span className="text-sm font-bold text-wellness-primary">{day.day}</span><h3 className="mt-1 text-lg font-semibold">Your meal rhythm</h3></div><div className="text-right text-xs font-semibold text-wellness-muted"><p className="flex items-center justify-end gap-1"><Flame size={14} />~{day.estimatedCalories} kcal</p><p className="mt-1">~{day.estimatedProtein}g protein</p></div></div><div className="divide-y px-5">{day.meals.map((meal) => <div key={`${meal.label}-${meal.time}`} className="flex min-w-0 gap-3 py-4"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-green-50 text-wellness-primary"><Clock3 size={17} /></span><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-wellness-muted">{meal.time} · {meal.label}</p><p className="mt-1 break-words text-sm font-medium leading-6">{meal.food}</p></div></div>)}</div></article> }
+
+function TweakPanel({ selectedDay, synced, onTweak, tweaking, error }) {
+  const [request, setRequest] = useState('')
+  const presets = [`Make only ${selectedDay}'s workout easier`, 'Shorten every workout', 'Add a little challenge to the week', 'Rebuild the week from my latest profile']
+  function submit(event) { event.preventDefault(); if (request.trim()) onTweak(request.trim()) }
+  return <section className="mt-5 rounded-3xl border border-lime-200 bg-white p-5 shadow-card sm:p-6"><div className="flex items-start gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-lime-100 text-wellness-primary"><WandSparkles size={21} /></span><div><h2 className="text-lg font-semibold">AI plan studio</h2><p className="mt-1 text-sm leading-6 text-wellness-muted">{synced ? 'Adjust one day or the whole week in plain language. A new synced version is saved only after you request it.' : 'Sync the plan with your profile before applying custom adjustments.'}</p></div></div><div className="mt-4 flex flex-wrap gap-2">{presets.map((preset) => <button type="button" key={preset} disabled={tweaking || !synced} onClick={() => onTweak(preset)} className="rounded-full border border-green-200 bg-green-50 px-3 py-2 text-xs font-semibold text-wellness-primary disabled:opacity-50">{preset}</button>)}</div><form onSubmit={submit} className="mt-4 flex flex-col gap-3 sm:flex-row"><label className="sr-only" htmlFor="plan-tweak">Describe a plan adjustment</label><input id="plan-tweak" disabled={!synced} value={request} onChange={(event) => setRequest(event.target.value.slice(0, 500))} placeholder={`Example: Move ${selectedDay}'s workout to another available day`} className="h-12 min-w-0 flex-1 rounded-xl border bg-wellness-background px-4 outline-none focus:border-wellness-primary disabled:opacity-60" /><button disabled={tweaking || !synced || request.trim().length < 3} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-wellness-primary px-5 font-semibold text-white disabled:opacity-50">{tweaking ? <LoaderCircle className="animate-spin" size={18} /> : <WandSparkles size={18} />}Apply and save</button></form>{error && <ErrorNotice message={error} />}</section>
+}
 
 function AdaptationCard({ message, reasons }) { return <div className="mt-5 rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 to-lime-50 p-5 sm:p-6"><div className="flex items-start gap-4"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white text-wellness-primary shadow-sm"><Sparkles size={21} /></span><div><p className="text-xs font-semibold uppercase tracking-wide text-wellness-primary">Why this plan fits</p><h2 className="mt-1 text-lg font-semibold">{message}</h2>{Array.isArray(reasons) && reasons.length > 0 && <ul className="mt-3 space-y-2 text-sm text-wellness-muted">{reasons.map((reason) => <li key={reason} className="flex gap-2"><CheckCircle2 className="mt-0.5 shrink-0 text-wellness-primary" size={16} />{reason}</li>)}</ul>}</div></div></div> }
 function Tab({ active, onClick, icon: Icon, children }) { return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition ${active ? 'bg-wellness-primary text-white shadow-sm' : 'text-wellness-muted hover:text-wellness-text'}`}><Icon size={18} />{children}</button> }
-function MetaPill({ label }) { return <span className="rounded-full border bg-white px-3 py-1.5 text-xs font-semibold text-wellness-muted">{label}</span> }
-function PreferenceSummary({ profile }) { const days = profile.workout_day_preferences?.length ? profile.workout_day_preferences.map((day) => day.slice(0, 3)).join(', ') : 'Balanced automatically'; const foods = profile.preferred_foods?.length ? profile.preferred_foods.join(', ') : 'No favorites selected'; const excluded = [...(profile.disliked_foods || []), ...(profile.allergies || [])].join(', ') || 'None'; return <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-white p-5 shadow-card"><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-wellness-primary">Your personalization</p><p className="mt-2 text-sm text-wellness-muted"><span className="font-semibold text-wellness-text">Workout days:</span> {days} <span className="mx-1">·</span> <span className="font-semibold text-wellness-text">Food favorites:</span> {foods}</p><p className="mt-1 text-sm text-wellness-muted"><span className="font-semibold text-wellness-text">Food exclusions:</span> {excluded}</p></div><Link to="/profile" className="shrink-0 rounded-xl border border-green-200 bg-green-50 px-4 py-2 text-sm font-semibold text-wellness-primary">Personalize and regenerate</Link></div> }
+function ViewButton({ active, onClick, icon: Icon, children }) { return <button type="button" onClick={onClick} className={`flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition ${active ? 'bg-wellness-primary text-white' : 'text-wellness-muted'}`}><Icon size={16} />{children}</button> }
+function DarkPill({ label }) { return <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-green-50">{label}</span> }
+function PlanStat({ value, label }) { return <div className="rounded-2xl bg-white/10 p-4 backdrop-blur"><p className="text-xl font-black sm:text-2xl">{value}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-green-100">{label}</p></div> }
+function PreferenceSummary({ profile }) { const days = profile.workout_day_preferences?.length ? profile.workout_day_preferences.map((day) => day.slice(0, 3)).join(', ') : 'Planner chooses a balanced schedule'; const foods = profile.preferred_foods?.length ? profile.preferred_foods.join(', ') : 'No favorites selected'; const excluded = [...(profile.disliked_foods || []), ...(profile.allergies || [])].join(', ') || 'None'; return <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border bg-white p-5 shadow-card"><div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wide text-wellness-primary">Your personalization</p><p className="mt-2 text-sm text-wellness-muted"><span className="font-semibold text-wellness-text">Preferred days:</span> {days} <span className="mx-1">·</span> <span className="font-semibold text-wellness-text">Food favorites:</span> {foods}</p><p className="mt-1 text-sm text-wellness-muted"><span className="font-semibold text-wellness-text">Food exclusions:</span> {excluded}</p></div><Link to="/profile" className="shrink-0 rounded-xl border border-green-200 bg-green-50 px-4 py-2 text-sm font-semibold text-wellness-primary">Edit profile</Link></div> }
 function Constraint({ icon: Icon, label, value }) { return <div className="min-w-0 rounded-xl border bg-white p-4"><Icon className="text-wellness-primary" size={20} /><p className="mt-3 text-xs font-semibold uppercase tracking-wide text-wellness-muted">{label}</p><p className="mt-1 truncate font-semibold">{value}</p></div> }
 function ErrorNotice({ message }) { return <div role="alert" className="mt-6 flex gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-700"><AlertCircle className="shrink-0" size={19} />{message}</div> }
 function GenerationSkeleton({ label, generating }) { return <section className="mx-auto max-w-4xl" aria-live="polite"><div className="rounded-2xl border bg-white p-8 text-center shadow-card"><span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-green-50 text-wellness-primary">{generating ? <Sparkles className="animate-pulse" /> : <LoaderCircle className="animate-spin" />}</span><h1 className="mt-5 text-2xl font-bold">{label}…</h1><p className="mt-2 text-wellness-muted">{generating ? 'Checking training constraints, meal preferences, and recovery-friendly pacing.' : 'This should only take a moment.'}</p><div className="mx-auto mt-8 max-w-xl space-y-3"><div className="h-4 animate-pulse rounded bg-wellness-border" /><div className="h-20 animate-pulse rounded-xl bg-wellness-background" /><div className="h-20 animate-pulse rounded-xl bg-wellness-background" /></div></div></section> }
-function fromRow(row) { return { summary: row.summary, workoutPlan: row.workout_plan, mealPlan: row.meal_plan, adaptationMessage: row.adaptation_message, adaptationReasons: row.adaptation_reasons, version: row.version, createdAt: row.created_at } }
 function formatDate(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Date unavailable' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) }
-function planError(error) { if (/relation .*plans.* does not exist/i.test(error.message)) return 'The plans table is not ready. Apply the latest Supabase migration, then try again.'; if (/duplicate key/i.test(error.message)) return 'An active plan already exists. Refresh the page to load it.'; return error.message || 'The plan could not be saved.' }
