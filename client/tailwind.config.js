@@ -5,16 +5,21 @@ export default {
     extend: {
       colors: {
         wellness: {
-          background: '#F5F7F2',
+          background: '#F5F4F0',
           surface: '#FFFFFF',
-          primary: '#166534',
-          accent: '#84CC16',
-          text: '#18201B',
-          muted: '#6B746D',
-          border: '#E4E8E2',
+          primary: '#0F766E',
+          accent: '#0891B2',
+          text: '#172B40',
+          muted: '#586779',
+          border: '#DCE3E7',
+          ink: '#142B43',
         },
       },
-      boxShadow: { card: '0 8px 30px rgba(24, 32, 27, 0.06)' },
+      fontFamily: {
+        sans: ['"Segoe UI"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['Georgia', '"Times New Roman"', 'serif'],
+      },
+      boxShadow: { card: '0 8px 28px rgba(20, 43, 67, 0.05)' },
     },
   },
   plugins: [],

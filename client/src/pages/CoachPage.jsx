@@ -142,7 +142,7 @@ export default function CoachPage() {
         <aside className="rounded-2xl border bg-white p-5 shadow-card">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-green-50 text-wellness-primary"><MessageSquare size={20} /></span>
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-teal-50 text-wellness-primary"><MessageSquare size={20} /></span>
               <div><h2 className="font-semibold">Conversations</h2><p className="text-xs text-wellness-muted">Up to {MAX_COACH_CHATS} recent chats</p></div>
             </div>
             <button type="button" onClick={startNewChat} disabled={sending} aria-label="Start a new chat" className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-wellness-primary text-white disabled:opacity-50"><Plus size={19} /></button>
@@ -156,7 +156,7 @@ export default function CoachPage() {
                 disabled={sending}
                 aria-current={chat.id === activeChat?.id ? 'true' : undefined}
                 onClick={() => selectChat(chat.id)}
-                className={`w-full truncate rounded-xl border px-3 py-2.5 text-left text-sm font-semibold disabled:opacity-50 ${chat.id === activeChat?.id ? 'border-green-300 bg-green-50 text-wellness-primary' : 'bg-wellness-background hover:border-green-300'}`}
+                className={`w-full truncate rounded-xl border px-3 py-2.5 text-left text-sm font-semibold disabled:opacity-50 ${chat.id === activeChat?.id ? 'border-teal-300 bg-teal-50 text-wellness-primary' : 'bg-wellness-background hover:border-teal-300'}`}
               >
                 {chat.title}
               </button>
@@ -164,12 +164,12 @@ export default function CoachPage() {
           </div>
 
           <div className="mt-6 flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-green-50 text-wellness-primary"><Sparkles size={21} /></span>
+            <span className="grid h-11 w-11 place-items-center rounded-xl bg-teal-50 text-wellness-primary"><Sparkles size={21} /></span>
             <div><h2 className="font-semibold">Suggested questions</h2><p className="text-xs text-wellness-muted">Start with one tap</p></div>
           </div>
           <div className="mt-4 space-y-2">
             {suggestions.map((item) => (
-              <button type="button" key={item} disabled={sending} onClick={() => send(item)} className="w-full rounded-xl border bg-wellness-background p-3 text-left text-sm font-semibold hover:border-green-300 disabled:opacity-50">
+              <button type="button" key={item} disabled={sending} onClick={() => send(item)} className="w-full rounded-xl border bg-wellness-background p-3 text-left text-sm font-semibold hover:border-teal-300 disabled:opacity-50">
                 {item}
               </button>
             ))}
@@ -183,7 +183,7 @@ export default function CoachPage() {
           <div className="border-b p-4">
             <div className="flex items-center gap-3">
               <span className="grid h-9 w-9 place-items-center rounded-full bg-wellness-primary text-white"><Bot size={18} /></span>
-              <div className="min-w-0"><p className="truncate text-sm font-semibold">{activeChat?.title || 'New chat'}</p><p className="text-xs text-wellness-muted">EvolveFit Coach · grounded in your current data</p></div>
+              <div className="min-w-0"><p className="truncate text-sm font-semibold">{activeChat?.title || 'New chat'}</p><p className="text-xs text-wellness-muted">VitalTrack Coach · grounded in your current data</p></div>
             </div>
           </div>
 
@@ -231,7 +231,7 @@ function Message({ role, content, fallback, pending }) {
   const Icon = assistant ? Bot : UserRound
   return (
     <div className={`flex gap-3 ${assistant ? '' : 'flex-row-reverse'} ${pending ? 'opacity-70' : ''}`}>
-      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${assistant ? 'bg-green-50 text-wellness-primary' : 'bg-wellness-primary text-white'}`}><Icon size={16} /></span>
+      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${assistant ? 'bg-teal-50 text-wellness-primary' : 'bg-wellness-primary text-white'}`}><Icon size={16} /></span>
       <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 ${assistant ? 'border bg-white text-wellness-text' : 'bg-wellness-primary text-white'}`}>
         <p className="whitespace-pre-wrap break-words">{content}</p>
         {fallback && <p className="mt-2 text-[11px] font-semibold text-wellness-muted">Local demo guidance</p>}

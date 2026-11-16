@@ -7,7 +7,7 @@ export default class AppErrorBoundary extends Component {
   static getDerivedStateFromError() { return { failed: true } }
 
   componentDidCatch(error, details) {
-    if (import.meta.env.DEV) console.error('EvolveFit render error', error, details)
+    if (import.meta.env.DEV) console.error('VitalTrack render error', error, details)
   }
 
   render() {

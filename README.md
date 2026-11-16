@@ -1,6 +1,8 @@
-# EvolveFit AI
+# VitalTrack AI
 
-EvolveFit AI is a fitness and nutrition coach that creates a seven-day plan from a saved user profile, records weekly recovery and adherence, visualizes progress, and applies user-requested AI plan adjustments.
+VitalTrack AI — Personalized Fitness Coaching and Health Tracking — creates a seven-day plan from a saved user profile, records weekly recovery and adherence, visualizes progress, and applies user-requested AI plan adjustments.
+
+This visual revision of EvolveFit AI introduces an ink-blue and teal theme, warm-white surfaces, serif headings, refreshed navigation, and a new landing page. Existing package names, account identifiers, and storage keys remain compatible with saved data. The local report handoff is in `report/vitaltrack/REPORT_HANDOFF.md`; report artifacts are excluded from Git.
 
 ## Stack
 

@@ -39,3 +39,6 @@ Desktop.ini
 
 # Locally generated internship report and its private/demo artifacts
 report/
+
+# Private data transfer bundles
+transfer/

@@ -7,7 +7,7 @@ export function calculateReadiness(checkIn) {
 }
 
 export function readinessLabel(score) {
-  if (score >= 75) return { label: 'Ready to progress', tone: 'text-green-700 bg-green-50' }
+  if (score >= 75) return { label: 'Ready to progress', tone: 'text-teal-700 bg-teal-50' }
   if (score >= 50) return { label: 'Steady and manageable', tone: 'text-amber-700 bg-amber-50' }
   return { label: 'Recovery first', tone: 'text-orange-700 bg-orange-50' }
 }

@@ -41,10 +41,10 @@ export function buildDailyReport(checkIn) {
   }
 }
 
-export function downloadDailyReportPdf(report, checkIn, fullName = 'EvolveFit profile') {
+export function downloadDailyReportPdf(report, checkIn, fullName = 'VitalTrack profile') {
   if (!report) return
   const lines = [
-    ['EvolveFit AI - Daily Wellness Report', 18],
+    ['VitalTrack AI - Daily Wellness Report', 18],
     [`Prepared for ${fullName}`, 10],
     [formatDate(report.createdAt), 10],
     ['', 10],
@@ -70,7 +70,7 @@ export function downloadDailyReportPdf(report, checkIn, fullName = 'EvolveFit pr
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `evolvefit-daily-report-${new Date(report.createdAt).toISOString().slice(0, 10)}.pdf`
+  link.download = `vitaltrack-daily-report-${new Date(report.createdAt).toISOString().slice(0, 10)}.pdf`
   document.body.appendChild(link)
   link.click()
   link.remove()

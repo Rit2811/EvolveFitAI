@@ -4,6 +4,21 @@
 
 @layer base {
   * { @apply border-wellness-border; }
-  body { @apply m-0 min-w-80 bg-wellness-background text-wellness-text antialiased; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+  body { @apply m-0 min-w-80 bg-wellness-background font-sans text-wellness-text antialiased; }
+  h1, h2 { @apply font-display; letter-spacing: -0.025em; }
+  h1 { text-wrap: balance; }
+  ::selection { background: #CCFBF1; color: #142B43; }
   button, a { @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wellness-accent focus-visible:ring-offset-2; }
+}
+
+@layer components {
+  .app-sidebar { background: linear-gradient(180deg, #142B43, #203E54); border-color: #28465B; }
+  .app-sidebar nav a { color: #CDDAE4; }
+  .app-sidebar nav a:hover { background: #28465B; color: white; }
+  .app-sidebar nav a[aria-current="page"] { background: #CCFBF1; color: #134E4A; }
+  .app-sidebar .brand { color: white; }
+  .app-sidebar .brand > span:last-child { color: #99F6E4; }
+  .app-sidebar .account-panel { border-color: #385064; color: #E2E8F0; }
+  .app-sidebar .account-panel button { color: #CDDAE4; }
+  .app-sidebar .account-panel button:hover { background: #28465B; }
 }
